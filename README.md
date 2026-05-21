@@ -13,7 +13,8 @@ A unified React Native interface for accessing health data from both **Android H
 
 ## Requirements
 
-- React Native >= 0.70
+- React Native >= 0.76
+- **New Architecture (bridgeless) required** — this library ships as a Turbo Native Module. It must be used in an app with the New Architecture enabled (the default since React Native 0.76). It will not load on the old/legacy bridge.
 - iOS 13.0+
 - Android API 28+ (Android 9+)
   - **Android 14+**: Health Connect is built into the framework (no setup needed)
@@ -278,6 +279,16 @@ try {
 ```
 
 ## Troubleshooting
+
+### `TurboModuleRegistry.getEnforcing('HealthKits') could not be found`
+
+This means the native module isn't compiled into the app. Check, in order:
+
+1. **New Architecture is enabled.** This is a Turbo Native Module and requires the New Architecture (default in RN 0.76+). iOS: `RCT_NEW_ARCH_ENABLED=1`. Android: `newArchEnabled=true` in `gradle.properties`.
+2. **You rebuilt the native app, not just reloaded JS.** Native changes need a full rebuild — `npx react-native run-ios` / `run-android`, or build from Xcode/Android Studio. A Metro reload is not enough.
+3. **iOS pods are installed:** `cd ios && pod install` after adding the package (or `RCT_NEW_ARCH_ENABLED=1 pod install`).
+4. **Metro cache is clear:** `npx react-native start --reset-cache`.
+5. **You are not running in Expo Go**, which can't load custom native modules — use a development build / `expo prebuild`.
 
 ### iOS
 

@@ -24,7 +24,7 @@ import kotlin.reflect.KClass
 
 @ReactModule(name = HealthKitsModule.NAME)
 class HealthKitsModule(reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext) {
+    NativeHealthKitsSpec(reactContext) {
 
     companion object {
         const val NAME = "HealthKits"
@@ -48,14 +48,12 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         return healthConnectClient
     }
 
-    @ReactMethod
-    fun isAvailable(promise: Promise) {
+    override fun isAvailable(promise: Promise) {
         val availability = HealthConnectClient.getSdkStatus(reactApplicationContext)
         promise.resolve(availability == HealthConnectClient.SDK_AVAILABLE)
     }
 
-    @ReactMethod
-    fun requestPermissions(permissionsJson: String, promise: Promise) {
+    override fun requestPermissions(permissionsJson: String, promise: Promise) {
         scope.launch {
             try {
                 val client = getHealthConnectClient()
@@ -97,8 +95,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun getPermissionStatus(dataType: String, accessType: String, promise: Promise) {
+    override fun getPermissionStatus(dataType: String, accessType: String, promise: Promise) {
         scope.launch {
             try {
                 val client = getHealthConnectClient()
@@ -125,8 +122,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun readData(optionsJson: String, promise: Promise) {
+    override fun readData(optionsJson: String, promise: Promise) {
         scope.launch {
             try {
                 val client = getHealthConnectClient()
@@ -172,8 +168,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun writeData(dataJson: String, promise: Promise) {
+    override fun writeData(dataJson: String, promise: Promise) {
         scope.launch {
             try {
                 val client = getHealthConnectClient()
@@ -206,8 +201,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun subscribeToUpdates(dataType: String, promise: Promise) {
+    override fun subscribeToUpdates(dataType: String, promise: Promise) {
         scope.launch {
             try {
                 val client = getHealthConnectClient()
@@ -236,14 +230,12 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun unsubscribeFromUpdates(subscriptionId: String, promise: Promise) {
+    override fun unsubscribeFromUpdates(subscriptionId: String, promise: Promise) {
         changesTokens.remove(subscriptionId)
         promise.resolve(null)
     }
 
-    @ReactMethod
-    fun openHealthConnectSettings(promise: Promise) {
+    override fun openHealthConnectSettings(promise: Promise) {
         try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 data = Uri.parse("healthconnect://settings")
@@ -266,13 +258,11 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun addListener(eventName: String) {
+    override fun addListener(eventName: String) {
         // Required for RN event emitter
     }
 
-    @ReactMethod
-    fun removeListeners(count: Int) {
+    override fun removeListeners(count: Double) {
         // Required for RN event emitter
     }
 
