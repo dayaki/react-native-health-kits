@@ -4,10 +4,14 @@ import android.content.Intent
 import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.aggregate.AggregateMetric
+import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.changes.Change
 import androidx.health.connect.client.changes.UpsertionChange
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.request.AggregateGroupByDurationRequest
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -18,8 +22,13 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.Period
+import java.time.ZoneId
 import java.time.ZoneOffset
+import java.util.UUID
 import kotlin.reflect.KClass
 
 @ReactModule(name = HealthKitsModule.NAME)
@@ -140,6 +149,25 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
                 val startDate = Instant.parse(options.getString("startDate"))
                 val endDate = Instant.parse(options.getString("endDate"))
                 val limit = options.optInt("limit", 1000)
+                val aggregate = options.optBoolean("aggregate", false)
+
+                // Aggregation is a read-time convenience for cumulative metrics only.
+                // Sleep/workout are session types and fall through to their raw readers,
+                // mirroring the iOS behaviour.
+                if (aggregate && type != "sleep" && type != "workout") {
+                    if (!isCumulativeType(type)) {
+                        promise.reject(
+                            "UNSUPPORTED_DATA_TYPE",
+                            "Aggregation is only supported for cumulative types " +
+                                "(steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). " +
+                                "'$type' is not a cumulative type; read raw records and aggregate in app code, or omit `aggregate`."
+                        )
+                        return@launch
+                    }
+                    val interval = options.optString("aggregateInterval", "day")
+                    promise.resolve(readAggregatedData(client, type, startDate, endDate, interval).toString())
+                    return@launch
+                }
 
                 val results = when (type) {
                     "steps" -> readSteps(client, startDate, endDate, limit)
@@ -327,6 +355,123 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
             "nutrition" -> NutritionRecord::class
             else -> null
         }
+    }
+
+    // Aggregation
+
+    /**
+     * Aggregation (cumulative sum per interval) only has a well-defined meaning for
+     * cumulative quantity types. Instantaneous types (heart rate, weight, blood
+     * glucose, etc.) must be read as raw records instead.
+     */
+    private fun isCumulativeType(type: String): Boolean = when (type) {
+        "steps", "distance", "activeCalories", "totalCalories", "floorsClimbed", "hydration" -> true
+        else -> false
+    }
+
+    private fun aggregateMetricFor(type: String): AggregateMetric<*>? = when (type) {
+        "steps" -> StepsRecord.COUNT_TOTAL
+        "distance" -> DistanceRecord.DISTANCE_TOTAL
+        "activeCalories" -> ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
+        "totalCalories" -> TotalCaloriesBurnedRecord.ENERGY_TOTAL
+        "floorsClimbed" -> FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL
+        "hydration" -> HydrationRecord.VOLUME_TOTAL
+        else -> null
+    }
+
+    private fun extractAggregateValue(type: String, result: AggregationResult): Double? = when (type) {
+        "steps" -> result[StepsRecord.COUNT_TOTAL]?.toDouble()
+        "distance" -> result[DistanceRecord.DISTANCE_TOTAL]?.inMeters
+        "activeCalories" -> result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+        "totalCalories" -> result[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories
+        "floorsClimbed" -> result[FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL]
+        "hydration" -> result[HydrationRecord.VOLUME_TOTAL]?.inLiters
+        else -> null
+    }
+
+    private fun aggregateUnitString(type: String): String = when (type) {
+        "steps", "floorsClimbed" -> "count"
+        "distance" -> "meters"
+        "activeCalories", "totalCalories" -> "kcal"
+        "hydration" -> "liters"
+        else -> "count"
+    }
+
+    private fun aggregateRecord(type: String, value: Double, unit: String, start: Instant, end: Instant): JSONObject =
+        JSONObject().apply {
+            // Aggregated buckets are synthetic and not deduplicable across syncs;
+            // generate an id and a constant "aggregated" source to mirror iOS.
+            put("id", UUID.randomUUID().toString())
+            put("type", type)
+            put("value", value)
+            put("unit", unit)
+            put("startDate", start.toString())
+            put("endDate", end.toString())
+            put("sourceName", "Aggregated")
+            put("sourceId", "aggregated")
+        }
+
+    /**
+     * Aggregate a cumulative metric into interval buckets using Health Connect's
+     * aggregate APIs. Hourly buckets use [HealthConnectClient.aggregateGroupByDuration];
+     * day/week/month buckets use [HealthConnectClient.aggregateGroupByPeriod], which is
+     * calendar-aware. Empty buckets (no data in range) are omitted, matching iOS.
+     */
+    private suspend fun readAggregatedData(
+        client: HealthConnectClient,
+        type: String,
+        start: Instant,
+        end: Instant,
+        interval: String
+    ): JSONArray {
+        val metric = aggregateMetricFor(type)
+            ?: return JSONArray()
+        val unit = aggregateUnitString(type)
+        val results = JSONArray()
+
+        if (interval == "hour") {
+            val response = client.aggregateGroupByDuration(
+                AggregateGroupByDurationRequest(
+                    metrics = setOf(metric),
+                    timeRangeFilter = TimeRangeFilter.between(start, end),
+                    timeRangeSlicer = Duration.ofHours(1)
+                )
+            )
+            response.forEach { bucket ->
+                val value = extractAggregateValue(type, bucket.result) ?: return@forEach
+                results.put(aggregateRecord(type, value, unit, bucket.startTime, bucket.endTime))
+            }
+        } else {
+            val period = when (interval) {
+                "week" -> Period.ofWeeks(1)
+                "month" -> Period.ofMonths(1)
+                else -> Period.ofDays(1)
+            }
+            val zone = ZoneId.systemDefault()
+            val response = client.aggregateGroupByPeriod(
+                AggregateGroupByPeriodRequest(
+                    metrics = setOf(metric),
+                    timeRangeFilter = TimeRangeFilter.between(
+                        LocalDateTime.ofInstant(start, zone),
+                        LocalDateTime.ofInstant(end, zone)
+                    ),
+                    timeRangeSlicer = period
+                )
+            )
+            response.forEach { bucket ->
+                val value = extractAggregateValue(type, bucket.result) ?: return@forEach
+                results.put(
+                    aggregateRecord(
+                        type,
+                        value,
+                        unit,
+                        bucket.startTime.atZone(zone).toInstant(),
+                        bucket.endTime.atZone(zone).toInstant()
+                    )
+                )
+            }
+        }
+        return results
     }
 
     // Read methods

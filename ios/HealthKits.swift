@@ -136,6 +136,10 @@ class HealthKits: RCTEventEmitter {
         } else if typeString == "workout" {
             readWorkoutData(startDate: startDate, endDate: endDate, limit: limit, resolve: resolve, reject: reject)
         } else if aggregate {
+            guard isCumulativeType(typeString) else {
+                reject("UNSUPPORTED_DATA_TYPE", "Aggregation is only supported for cumulative types (steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). '\(typeString)' is not a cumulative type; read raw records and aggregate in app code, or omit `aggregate`.", nil)
+                return
+            }
             let interval = options["aggregateInterval"] as? String ?? "day"
             readAggregatedData(type: typeString, startDate: startDate, endDate: endDate, interval: interval, resolve: resolve, reject: reject)
         } else {
@@ -276,6 +280,18 @@ class HealthKits: RCTEventEmitter {
     
     private func getHKSampleType(for typeString: String) -> HKSampleType? {
         return getHKObjectType(for: typeString) as? HKSampleType
+    }
+
+    /// Aggregation (cumulative sum per interval) only has a well-defined meaning
+    /// for cumulative quantity types. Instantaneous types (heart rate, weight,
+    /// blood glucose, etc.) must be read as raw records instead.
+    private func isCumulativeType(_ typeString: String) -> Bool {
+        switch typeString {
+        case "steps", "distance", "activeCalories", "totalCalories", "floorsClimbed", "hydration":
+            return true
+        default:
+            return false
+        }
     }
     
     private func getHKUnit(for typeString: String) -> HKUnit {

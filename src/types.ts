@@ -147,6 +147,21 @@ export type WorkoutType =
   | 'other';
 
 /**
+ * Cumulative data types that support aggregation.
+ *
+ * Aggregation produces a cumulative sum per interval, which only has a
+ * well-defined meaning for these types. Requesting aggregation for any other
+ * (instantaneous) type rejects with `UNSUPPORTED_DATA_TYPE`.
+ */
+export type CumulativeDataType =
+  | 'steps'
+  | 'distance'
+  | 'activeCalories'
+  | 'totalCalories'
+  | 'floorsClimbed'
+  | 'hydration';
+
+/**
  * Options for reading health data
  */
 export interface ReadOptions {
@@ -156,11 +171,23 @@ export interface ReadOptions {
   startDate: Date | string;
   /** End date for the query (ISO 8601 string or Date) */
   endDate: Date | string;
-  /** Maximum number of records to return */
+  /** Maximum number of records to return (ignored when `aggregate` is true) */
   limit?: number;
-  /** Whether to aggregate data (for quantity types) */
+  /**
+   * Aggregate into a cumulative sum per interval.
+   *
+   * Supported only for {@link CumulativeDataType} (steps, distance,
+   * activeCalories, totalCalories, floorsClimbed, hydration) on both iOS and
+   * Android. Requesting it for any other type rejects with
+   * `UNSUPPORTED_DATA_TYPE` — read those as raw records and aggregate in app
+   * code instead.
+   *
+   * Aggregated results are derived/synthetic: they have generated `id`s and an
+   * `"aggregated"` source, so they are not stable or deduplicable. For
+   * sync/storage, persist raw records instead and aggregate at read time.
+   */
   aggregate?: boolean;
-  /** Aggregation interval when aggregate is true */
+  /** Aggregation interval when `aggregate` is true. Defaults to `'day'`. */
   aggregateInterval?: 'hour' | 'day' | 'week' | 'month';
 }
 

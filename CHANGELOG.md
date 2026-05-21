@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Android: `readData` now honors `aggregate` / `aggregateInterval` using Health
+  Connect's aggregate APIs (`aggregateGroupByPeriod` for day/week/month,
+  `aggregateGroupByDuration` for hour), reaching parity with iOS.
+
+### Fixed
+- Aggregation is now restricted to cumulative types (`steps`, `distance`,
+  `activeCalories`, `totalCalories`, `floorsClimbed`, `hydration`) on both
+  platforms. Previously iOS silently summed instantaneous types (e.g.
+  `heartRate`, `weight`), and Android ignored `aggregate` entirely. Unsupported
+  types now reject with `UNSUPPORTED_DATA_TYPE`.
+
 ## [1.0.0] - 2025-11-26
 
 ### Added
