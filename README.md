@@ -14,7 +14,7 @@ A unified React Native interface for accessing health data from both **Android H
 ## Requirements
 
 - React Native >= 0.70
-- iOS 13.0+
+- iOS 16.0+
 - Android API 28+ (Android 9+)
   - **Android 14+**: Health Connect is built into the framework (no setup needed)
   - **Android 9-13**: Health Connect app must be installed from Play Store
