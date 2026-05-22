@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
   Connect's aggregate APIs (`aggregateGroupByPeriod` for day/week/month,
   `aggregateGroupByDuration` for hour), reaching parity with iOS.
 
+### Changed
+- Raised the iOS deployment target from 13.0 to 16.0. The Swift sources use
+  `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
+  `HKWorkoutActivityType.dance` (iOS 14+), so the previous 13.0 floor never
+  actually compiled. The podspec and README now reflect the real minimum
+  (fixes #3).
+
 ### Fixed
 - Aggregation is now restricted to cumulative types (`steps`, `distance`,
   `activeCalories`, `totalCalories`, `floorsClimbed`, `hydration`) on both
