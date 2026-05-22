@@ -15,7 +15,7 @@ A unified React Native interface for accessing health data from both **Android H
 
 - React Native >= 0.76
 - **New Architecture (bridgeless) required** — this library ships as a Turbo Native Module. It must be used in an app with the New Architecture enabled (the default since React Native 0.76). It will not load on the old/legacy bridge.
-- iOS 13.0+
+- iOS 16.0+
 - Android API 28+ (Android 9+)
   - **Android 14+**: Health Connect is built into the framework (no setup needed)
   - **Android 9-13**: Health Connect app must be installed from Play Store

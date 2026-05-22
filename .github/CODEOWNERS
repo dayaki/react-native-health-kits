@@ -1,0 +1,8 @@
+# Code owners for react-native-health-kits
+# These owners are automatically requested for review and are the
+# required reviewers on protected branches.
+#
+# Docs: https://docs.github.com/articles/about-code-owners
+
+# Default owner for everything in the repo
+* @dayaki
