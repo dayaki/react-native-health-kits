@@ -47,3 +47,8 @@ coverage/
 
 # Turborepo
 .turbo/
+
+# Example app (native projects are generated via scripts/bootstrap-example.sh)
+example/ios/Pods/
+example/android/app/build/
+example/android/.cxx/
