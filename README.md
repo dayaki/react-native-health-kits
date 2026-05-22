@@ -131,6 +131,21 @@ const dailySteps = await HealthKits.readData({
 });
 ```
 
+> **Aggregation is for cumulative types only.** `aggregate` produces a
+> cumulative sum per interval, which is only meaningful for **`steps`,
+> `distance`, `activeCalories`, `totalCalories`, `floorsClimbed`, and
+> `hydration`**. Requesting it for any other (instantaneous) type — e.g.
+> `heartRate`, `weight`, `bloodGlucose` — rejects with `UNSUPPORTED_DATA_TYPE`.
+> Read those as raw records and aggregate in app code instead.
+>
+> This behaves the same on iOS (HealthKit `HKStatisticsCollectionQuery`) and
+> Android (Health Connect `aggregateGroupByPeriod` / `aggregateGroupByDuration`).
+>
+> **For sync/storage, don't store aggregated results.** They are derived and
+> synthetic — each query assigns a generated `id` and an `"aggregated"` source,
+> so they have no stable identity and can't be deduplicated. Persist raw
+> provider records as your source of truth and aggregate at read time.
+
 ### Reading Sleep Data
 
 ```typescript
@@ -194,7 +209,9 @@ interface ReadOptions {
   startDate: Date | string;
   endDate: Date | string;
   limit?: number;
+  /** Cumulative types only (steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). */
   aggregate?: boolean;
+  /** Defaults to 'day'. */
   aggregateInterval?: 'hour' | 'day' | 'week' | 'month';
 }
 ```
