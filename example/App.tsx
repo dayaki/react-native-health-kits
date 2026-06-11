@@ -12,6 +12,8 @@ import {
 import HealthKits, {
   HealthData,
   HealthPermission,
+  HealthKitError,
+  HealthKitErrorCode,
 } from '@mbdayo/react-native-health-kits';
 
 const App = () => {
@@ -19,6 +21,10 @@ const App = () => {
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [stepsData, setStepsData] = useState<HealthData[]>([]);
   const [heartRateData, setHeartRateData] = useState<HealthData[]>([]);
+  const [dailySteps, setDailySteps] = useState<HealthData[]>([]);
+  const [aggregateGuardResult, setAggregateGuardResult] = useState<string | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -117,6 +123,52 @@ const App = () => {
     }
   };
 
+  // #8: aggregated read — daily step totals (a cumulative type).
+  const readDailySteps = async () => {
+    setLoading(true);
+    try {
+      const data = await HealthKits.readData({
+        type: 'steps',
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
+        endDate: new Date(),
+        aggregate: true,
+        aggregateInterval: 'day',
+      });
+      setDailySteps(data);
+    } catch (error) {
+      Alert.alert('Error', `Failed to read daily steps: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // #8: aggregating a non-cumulative type must reject with UNSUPPORTED_DATA_TYPE.
+  const testAggregateGuard = async () => {
+    setLoading(true);
+    setAggregateGuardResult(null);
+    try {
+      await HealthKits.readData({
+        type: 'heartRate',
+        startDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        endDate: new Date(),
+        aggregate: true,
+        aggregateInterval: 'day',
+      });
+      setAggregateGuardResult('❌ Expected a rejection, but the call resolved');
+    } catch (error) {
+      if (
+        error instanceof HealthKitError &&
+        error.code === HealthKitErrorCode.UNSUPPORTED_DATA_TYPE
+      ) {
+        setAggregateGuardResult('✅ Rejected with UNSUPPORTED_DATA_TYPE (correct)');
+      } else {
+        setAggregateGuardResult(`⚠️ Rejected with an unexpected error: ${error}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openSettings = async () => {
     if (Platform.OS === 'android') {
       await HealthKits.openHealthConnectSettings();
@@ -208,6 +260,51 @@ const App = () => {
                   {'value' in record ? `${record.value} bpm` : '-'}
                 </Text>
               ))}
+            </View>
+          )}
+        </View>
+
+        {/* Aggregated Steps (#8) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Daily Step Totals (Last 30 Days)</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={readDailySteps}
+            disabled={loading || !permissionsGranted}
+          >
+            <Text style={styles.buttonText}>Read Aggregated (daily)</Text>
+          </TouchableOpacity>
+          {dailySteps.length > 0 && (
+            <View style={styles.dataContainer}>
+              <Text style={styles.dataText}>Buckets: {dailySteps.length}</Text>
+              {dailySteps.slice(0, 5).map((record, index) => (
+                <Text key={index} style={styles.dataText}>
+                  {record.startDate.slice(0, 10)}:{' '}
+                  {'value' in record ? Math.round(record.value as number) : '-'}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Aggregation Guard (#8) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Aggregation Guard</Text>
+          <Text style={styles.status}>
+            Aggregating a non-cumulative type (heartRate) should reject.
+          </Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={testAggregateGuard}
+            disabled={loading || !permissionsGranted}
+          >
+            <Text style={styles.buttonText}>
+              Test heartRate Aggregate (expect reject)
+            </Text>
+          </TouchableOpacity>
+          {aggregateGuardResult && (
+            <View style={styles.dataContainer}>
+              <Text style={styles.dataText}>{aggregateGuardResult}</Text>
             </View>
           )}
         </View>
