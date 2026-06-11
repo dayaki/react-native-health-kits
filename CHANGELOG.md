@@ -10,6 +10,16 @@ All notable changes to this project will be documented in this file.
   `aggregateGroupByDuration` for hour), reaching parity with iOS.
 
 ### Changed
+- **BREAKING:** Converted to a true Turbo Native Module and dropped legacy-bridge
+  support. The library now requires the **New Architecture** (bridgeless) and
+  **React Native >= 0.76**.
+  - iOS: the module binds to the codegen spec via `getTurboModule`
+    (`HealthKits.m` → `HealthKits.mm`); the Swift implementation is unchanged.
+  - Android: `HealthKitsModule` now extends the generated `NativeHealthKitsSpec`
+    and `HealthKitsPackage` extends `BaseReactPackage`.
+  - This fixes the `TurboModuleRegistry.getEnforcing('HealthKits') could not be
+    found` error caused by the previous legacy-module/TurboModule-spec mismatch
+    (#1).
 - Raised the iOS deployment target from 13.0 to 16.0. The Swift sources use
   `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
   `HKWorkoutActivityType.dance` (iOS 14+), so the previous 13.0 floor never
