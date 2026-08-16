@@ -68,7 +68,7 @@ lookup tables directly.
   `TurboModuleRegistry.getEnforcing('HealthKits') could not be found`.
 
 ### Changed
-- **Breaking — iOS `totalCalories` now means total energy (active + basal).**
+- **BREAKING — iOS `totalCalories` now means total energy (active + basal).**
   It previously mapped to `basalEnergyBurned`, i.e. resting energy only, while
   Android mapped it to `TotalCaloriesBurnedRecord` (active + basal), so the
   same type returned two different metrics per platform (fixes #4). iOS now
@@ -98,29 +98,11 @@ lookup tables directly.
   - This fixes the `TurboModuleRegistry.getEnforcing('HealthKits') could not be
     found` error caused by the previous legacy-module/TurboModule-spec mismatch
     (fixes #1).
-- **BREAKING — iOS `totalCalories` now means total energy (active + basal).**
-  It previously mapped to `basalEnergyBurned`, i.e. resting energy only, while
-  Android mapped it to `TotalCaloriesBurnedRecord` (active + basal), so the
-  same type returned two different metrics per platform (fixes #4). iOS now
-  derives it by summing `activeEnergyBurned` + `basalEnergyBurned`.
 - **BREAKING:** Raised the iOS deployment target from 13.0 to 16.0. The Swift
   sources use `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
-    (#1).
-- Raised the iOS deployment target from 13.0 to 16.0. The Swift sources use
-  `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
   `HKWorkoutActivityType.dance` (iOS 14+), so the previous 13.0 floor never
   actually compiled. The podspec and README now reflect the real minimum
   (fixes #3).
-- Derived types (`totalCalories` on iOS, `basalCalories` on Android) have no
-  records of their own: an un-aggregated read returns one record for the whole
-  window with a generated `id` and a `"derived"` source, while an aggregated
-  read buckets by interval and reports an `"aggregated"` source like any other
-  aggregate. Writing, subscribing to, or requesting write access for one rejects
-  with `UNSUPPORTED_DATA_TYPE`. Requesting *read* access for `totalCalories` on
-  iOS now covers both underlying types, since the derived read needs both.
-- `healthDataTypeToiOS` / `healthDataTypeToAndroid` are now typed
-  `Record<HealthDataType, string | string[]>`; `totalCalories` on iOS lists both
-  identifiers it is derived from.
 
 ### Fixed
 - Aggregation is now restricted to cumulative types (`steps`, `distance`,
