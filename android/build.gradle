@@ -12,16 +12,14 @@ buildscript {
     }
 }
 
-def isNewArchitectureEnabled() {
-    return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
-}
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
-if (isNewArchitectureEnabled()) {
-    apply plugin: "com.facebook.react"
-}
+// Applied unconditionally: HealthKitsModule extends the codegen-generated
+// NativeHealthKitsSpec, so the spec has to be generated on every build. Gating
+// this on newArchEnabled left the class undefined whenever the flag was off or
+// absent, and the module failed to compile with "Unresolved reference".
+apply plugin: "com.facebook.react"
 
 def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["HealthKits_" + name]
@@ -66,13 +64,16 @@ android {
         disable "GradleCompatible"
     }
 
+    // React Native 0.76 builds on JDK 17 and compiles app Java at 17. Leaving
+    // these at 1.8 makes Gradle fail the build with "Inconsistent JVM-target
+    // compatibility detected" as soon as the library's Kotlin is compiled.
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 }
 
