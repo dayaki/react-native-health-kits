@@ -68,14 +68,6 @@ lookup tables directly.
   `TurboModuleRegistry.getEnforcing('HealthKits') could not be found`.
 
 ### Changed
-  `aggregateGroupByDuration` for hour), reaching parity with iOS.
-- New `basalCalories` data type for resting/basal energy, on both platforms.
-  iOS reads `basalEnergyBurned` directly; Android derives it from
-  `BasalMetabolicRateRecord` via `BASAL_CALORIES_TOTAL`.
-- Android: `writeData` supports `totalCalories`, which previously fell through
-  the `when` and silently resolved `false`.
-
-### Changed
 - **Breaking — iOS `totalCalories` now means total energy (active + basal).**
   It previously mapped to `basalEnergyBurned`, i.e. resting energy only, while
   Android mapped it to `TotalCaloriesBurnedRecord` (active + basal), so the
