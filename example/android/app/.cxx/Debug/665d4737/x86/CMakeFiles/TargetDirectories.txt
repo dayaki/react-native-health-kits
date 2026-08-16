@@ -1,0 +1,6 @@
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/CMakeFiles/appmodules.dir
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/CMakeFiles/edit_cache.dir
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/CMakeFiles/rebuild_cache.dir
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/RNHealthKitsSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/RNHealthKitsSpec_autolinked_build/CMakeFiles/rebuild_cache.dir

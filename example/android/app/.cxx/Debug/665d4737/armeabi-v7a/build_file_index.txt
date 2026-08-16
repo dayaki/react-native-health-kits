@@ -1,0 +1,2 @@
+/Users/dayo/Developer/packages/react-native-health-kits/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/dayo/Developer/packages/react-native-health-kits/example/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt

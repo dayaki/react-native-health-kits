@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      - run: yarn typecheck
+
+  android:
+    name: Android build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      # Compiles the library's Kotlin and runs codegen for NativeHealthKitsSpec.
+      # This is what catches an unresolved spec reference or a Health Connect
+      # API that does not exist in the pinned connect-client version.
+      - name: Assemble example
+        working-directory: example/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+  ios:
+    name: iOS build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      - name: Install pods
+        working-directory: example/ios
+        env:
+          RCT_NEW_ARCH_ENABLED: '1'
+        run: pod install
+
+      # Compiles the library's Swift against the codegen-generated TurboModule
+      # spec. A simulator build is enough — HealthKit compiles there, only its
+      # data is unavailable at runtime, which is a device-only concern.
+      - name: Build for simulator
+        working-directory: example/ios
+        run: |
+          xcodebuild \
+            -workspace HealthKitsExample.xcworkspace \
+            -scheme HealthKitsExample \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

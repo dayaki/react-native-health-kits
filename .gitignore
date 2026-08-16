@@ -6,6 +6,15 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Yarn (berry) — keep the release/plugins, drop the cache and PnP artifacts
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
 # Build
 lib/
 
@@ -48,7 +57,13 @@ coverage/
 # Turborepo
 .turbo/
 
-# Example app (native projects are generated via scripts/bootstrap-example.sh)
+# Example app — the native host projects are committed so CI can build them,
+# but their generated/machine-local output is not.
 example/ios/Pods/
+example/ios/build/
+example/ios/.xcode.env.local
+example/android/build/
 example/android/app/build/
+example/android/.gradle/
 example/android/.cxx/
+example/android/local.properties

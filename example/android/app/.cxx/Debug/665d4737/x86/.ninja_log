@@ -1,0 +1,12 @@
+# ninja log v5
+0	13	0	/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/x86/CMakeFiles/cmake.verify_globs	8be5786853518409
+2	890	1786840548971572657	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/States.cpp.o	55db0ef511189eec
+1	992	1786840549073426855	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/EventEmitters.cpp.o	f08bd7326ff82fc2
+1	1178	1786840549260368379	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/RNHealthKitsSpecJSI-generated.cpp.o	5ff5206f4c96d10f
+1	1186	1786840549270093373	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/ShadowNodes.cpp.o	369faf54b40af18a
+1	1222	1786840549303219942	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/RNHealthKitsSpec-generated.cpp.o	6e11f6bbc035a57f
+1	1237	1786840549320154857	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/ComponentDescriptors.cpp.o	62a60c6bc2de5586
+0	1307	1786840549390177459	CMakeFiles/appmodules.dir/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	dff620278136ed47
+1	1310	1786840549394104923	RNHealthKitsSpec_autolinked_build/CMakeFiles/react_codegen_RNHealthKitsSpec.dir/react/renderer/components/RNHealthKitsSpec/Props.cpp.o	d6ea1387bca9f13c
+0	1471	1786840549552747354	CMakeFiles/appmodules.dir/OnLoad.cpp.o	a4474251c138d6a
+1471	1551	1786840549635374193	/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/build/intermediates/cxx/Debug/665d4737/obj/x86/libappmodules.so	229b8609dc06dd68
