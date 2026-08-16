@@ -11,7 +11,10 @@ All notable changes to this project will be documented in this file.
   - iOS: the module binds to the codegen spec via `getTurboModule`
     (`HealthKits.m` → `HealthKits.mm`); the Swift implementation is unchanged.
   - Android: `HealthKitsModule` now extends the generated `NativeHealthKitsSpec`
-    and `HealthKitsPackage` extends `BaseReactPackage`.
+    and `HealthKitsPackage` extends `BaseReactPackage`. The React Gradle plugin
+    is applied unconditionally so codegen always produces that spec — it was
+    gated on `newArchEnabled`, which left the class undefined and the module
+    failing to compile whenever the flag was off or absent.
   - This fixes the `TurboModuleRegistry.getEnforcing('HealthKits') could not be
     found` error caused by the previous legacy-module/TurboModule-spec mismatch
     (#1).
