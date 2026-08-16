@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "prefabPath": "/Users/dayo/.gradle/caches/modules-2/files-2.1/com.google.prefab/cli/2.1.0/aa32fec809c44fa531f01dcfb739b5b3304d3050/cli-2.1.0-all.jar",
+  "packages": [
+    "/Users/dayo/.gradle/caches/8.10.2/transforms/ffea390e40bce9ede11ecb704e97298f/transformed/react-android-0.76.6-debug/prefab",
+    "/Users/dayo/.gradle/caches/8.10.2/transforms/33e24b2bb229fd8033f60c69395256d5/transformed/hermes-android-0.76.6-debug/prefab",
+    "/Users/dayo/.gradle/caches/8.10.2/transforms/712459f74e1b69cabe04723869743a98/transformed/fbjni-0.6.0/prefab"
+  ]
+}
