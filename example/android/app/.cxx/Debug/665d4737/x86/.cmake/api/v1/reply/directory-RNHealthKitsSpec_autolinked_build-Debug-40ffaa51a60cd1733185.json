@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "RNHealthKitsSpec_autolinked_build",
+		"source" : "/Users/dayo/Developer/packages/react-native-health-kits/android/build/generated/source/codegen/jni"
+	}
+}

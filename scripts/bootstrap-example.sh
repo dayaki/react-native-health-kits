@@ -56,6 +56,13 @@ if [[ -f "$PLIST" ]]; then
     "$PLIST" 2>/dev/null || true
 fi
 
+# --- Android: raise minSdk (Health Connect needs 26; the library documents 28) ---
+APP_GRADLE="$EXAMPLE_DIR/android/build.gradle"
+if [[ -f "$APP_GRADLE" ]]; then
+  echo "▸ Setting minSdkVersion to 28…"
+  sed -i.bak -E "s/^([[:space:]]*)minSdkVersion = .*/\1minSdkVersion = 28/" "$APP_GRADLE" && rm -f "$APP_GRADLE.bak"
+fi
+
 # --- Android: ensure the New Architecture is on (default in 0.76, but be safe) ---
 GRADLE_PROPS="$EXAMPLE_DIR/android/gradle.properties"
 if [[ -f "$GRADLE_PROPS" ]]; then

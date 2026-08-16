@@ -1,11 +1,22 @@
 /**
  * Health data types supported by both iOS HealthKit and Android Health Connect
+ *
+ * Energy types are defined by meaning, not by the underlying platform record:
+ *
+ * - `activeCalories` — energy burned by activity, on top of resting.
+ * - `basalCalories` — resting/basal energy.
+ * - `totalCalories` — all energy burned, i.e. active + basal.
+ *
+ * Each platform stores two of the three natively and the library derives the
+ * third, so a given type means the same thing everywhere. See
+ * {@link DerivedDataType} for what that implies for `id`s and writes.
  */
 export type HealthDataType =
   // Activity
   | 'steps'
   | 'distance'
   | 'activeCalories'
+  | 'basalCalories'
   | 'totalCalories'
   | 'floorsClimbed'
   // Vitals
@@ -157,9 +168,27 @@ export type CumulativeDataType =
   | 'steps'
   | 'distance'
   | 'activeCalories'
+  | 'basalCalories'
   | 'totalCalories'
   | 'floorsClimbed'
   | 'hydration';
+
+/**
+ * Data types that are computed by this library rather than read straight from
+ * a platform record, because the platform has no native equivalent.
+ *
+ * - `totalCalories` on iOS — summed from `activeEnergyBurned` +
+ *   `basalEnergyBurned`. Android reads `TotalCaloriesBurnedRecord` natively.
+ * - `basalCalories` on Android — summed from `BasalMetabolicRateRecord` via
+ *   the `BASAL_CALORIES_TOTAL` metric. iOS reads `basalEnergyBurned` natively.
+ *
+ * Derived records behave like aggregated ones: they carry a generated `id` and
+ * a synthetic source — `"derived"` for a plain read, `"aggregated"` when
+ * `aggregate` is set — so they are not stable or deduplicable. Read the
+ * underlying types if you need to persist raw records. A derived type also
+ * cannot be written; `writeData` rejects it with `UNSUPPORTED_DATA_TYPE`.
+ */
+export type DerivedDataType = 'totalCalories' | 'basalCalories';
 
 /**
  * Options for reading health data
@@ -177,8 +206,8 @@ export interface ReadOptions {
    * Aggregate into a cumulative sum per interval.
    *
    * Supported only for {@link CumulativeDataType} (steps, distance,
-   * activeCalories, totalCalories, floorsClimbed, hydration) on both iOS and
-   * Android. Requesting it for any other type rejects with
+   * activeCalories, basalCalories, totalCalories, floorsClimbed, hydration) on
+   * both iOS and Android. Requesting it for any other type rejects with
    * `UNSUPPORTED_DATA_TYPE` — read those as raw records and aggregate in app
    * code instead.
    *

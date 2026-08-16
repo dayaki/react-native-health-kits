@@ -227,6 +227,7 @@ export function getDefaultUnit(dataType: string): HealthUnit {
     case 'distance':
       return 'meters';
     case 'activeCalories':
+    case 'basalCalories':
     case 'totalCalories':
       return 'kcal';
     case 'heartRate':

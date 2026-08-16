@@ -68,6 +68,31 @@ lookup tables directly.
   `TurboModuleRegistry.getEnforcing('HealthKits') could not be found`.
 
 ### Changed
+  `aggregateGroupByDuration` for hour), reaching parity with iOS.
+- New `basalCalories` data type for resting/basal energy, on both platforms.
+  iOS reads `basalEnergyBurned` directly; Android derives it from
+  `BasalMetabolicRateRecord` via `BASAL_CALORIES_TOTAL`.
+- Android: `writeData` supports `totalCalories`, which previously fell through
+  the `when` and silently resolved `false`.
+
+### Changed
+- **Breaking — iOS `totalCalories` now means total energy (active + basal).**
+  It previously mapped to `basalEnergyBurned`, i.e. resting energy only, while
+  Android mapped it to `TotalCaloriesBurnedRecord` (active + basal), so the
+  same type returned two different metrics per platform (fixes #4). iOS now
+  derives it by summing `activeEnergyBurned` + `basalEnergyBurned`. **If you
+  were reading `totalCalories` on iOS to get resting energy, switch to
+  `basalCalories`.**
+- Derived types (`totalCalories` on iOS, `basalCalories` on Android) have no
+  records of their own: an un-aggregated read returns one record for the whole
+  window with a generated `id` and a `"derived"` source, while an aggregated
+  read buckets by interval and reports an `"aggregated"` source like any other
+  aggregate. Writing, subscribing to, or requesting write access for one rejects
+  with `UNSUPPORTED_DATA_TYPE`. Requesting *read* access for `totalCalories` on
+  iOS now covers both underlying types, since the derived read needs both.
+- `healthDataTypeToiOS` / `healthDataTypeToAndroid` are now typed
+  `Record<HealthDataType, string | string[]>`; `totalCalories` on iOS lists both
+  identifiers it is derived from.
 - **BREAKING:** Converted to a true Turbo Native Module and dropped legacy-bridge
   support. The library now requires the **New Architecture** (bridgeless) and
   **React Native >= 0.76**.
@@ -88,6 +113,9 @@ lookup tables directly.
   derives it by summing `activeEnergyBurned` + `basalEnergyBurned`.
 - **BREAKING:** Raised the iOS deployment target from 13.0 to 16.0. The Swift
   sources use `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
+    (#1).
+- Raised the iOS deployment target from 13.0 to 16.0. The Swift sources use
+  `HKCategoryValueSleepAnalysis.asleepUnspecified` (iOS 16+) and
   `HKWorkoutActivityType.dance` (iOS 14+), so the previous 13.0 floor never
   actually compiled. The podspec and README now reflect the real minimum
   (fixes #3).

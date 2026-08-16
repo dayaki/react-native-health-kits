@@ -1,0 +1,37 @@
+{
+  "buildFiles": [
+    "/Users/dayo/Developer/packages/react-native-health-kits/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/dayo/Developer/packages/react-native-health-kits/example/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/dayo/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/dayo/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/.cxx/Debug/665d4737/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "artifactName": "appmodules",
+      "abi": "arm64-v8a",
+      "output": "/Users/dayo/Developer/packages/react-native-health-kits/example/android/app/build/intermediates/cxx/Debug/665d4737/obj/arm64-v8a/libappmodules.so",
+      "runtimeFiles": [
+        "/Users/dayo/.gradle/caches/8.10.2/transforms/712459f74e1b69cabe04723869743a98/transformed/fbjni-0.6.0/prefab/modules/fbjni/libs/android.arm64-v8a/libfbjni.so",
+        "/Users/dayo/.gradle/caches/8.10.2/transforms/ffea390e40bce9ede11ecb704e97298f/transformed/react-android-0.76.6-debug/prefab/modules/jsi/libs/android.arm64-v8a/libjsi.so",
+        "/Users/dayo/.gradle/caches/8.10.2/transforms/ffea390e40bce9ede11ecb704e97298f/transformed/react-android-0.76.6-debug/prefab/modules/reactnative/libs/android.arm64-v8a/libreactnative.so"
+      ]
+    },
+    "react_codegen_RNHealthKitsSpec::@707a6924ad8651b718dc": {
+      "artifactName": "react_codegen_RNHealthKitsSpec",
+      "abi": "arm64-v8a",
+      "runtimeFiles": []
+    }
+  }
+}

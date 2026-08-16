@@ -13,7 +13,8 @@ A unified React Native interface for accessing health data from both **Android H
 
 ## Requirements
 
-- React Native >= 0.70
+- React Native >= 0.76
+- **New Architecture (bridgeless) required** — this library ships as a Turbo Native Module. It must be used in an app with the New Architecture enabled (the default since React Native 0.76). It will not load on the old/legacy bridge.
 - iOS 16.0+
 - Android API 28+ (Android 9+)
   - **Android 14+**: Health Connect is built into the framework (no setup needed)
@@ -133,10 +134,11 @@ const dailySteps = await HealthKits.readData({
 
 > **Aggregation is for cumulative types only.** `aggregate` produces a
 > cumulative sum per interval, which is only meaningful for **`steps`,
-> `distance`, `activeCalories`, `totalCalories`, `floorsClimbed`, and
-> `hydration`**. Requesting it for any other (instantaneous) type — e.g.
-> `heartRate`, `weight`, `bloodGlucose` — rejects with `UNSUPPORTED_DATA_TYPE`.
-> Read those as raw records and aggregate in app code instead.
+> `distance`, `activeCalories`, `basalCalories`, `totalCalories`,
+> `floorsClimbed`, and `hydration`**. Requesting it for any other
+> (instantaneous) type — e.g. `heartRate`, `weight`, `bloodGlucose` — rejects
+> with `UNSUPPORTED_DATA_TYPE`. Read those as raw records and aggregate in app
+> code instead.
 >
 > This behaves the same on iOS (HealthKit `HKStatisticsCollectionQuery`) and
 > Android (Health Connect `aggregateGroupByPeriod` / `aggregateGroupByDuration`).
@@ -145,6 +147,38 @@ const dailySteps = await HealthKits.readData({
 > synthetic — each query assigns a generated `id` and an `"aggregated"` source,
 > so they have no stable identity and can't be deduplicated. Persist raw
 > provider records as your source of truth and aggregate at read time.
+
+### Energy (Calories)
+
+Energy types are defined by what they mean, not by which platform record backs
+them, so the same type means the same thing on both platforms:
+
+| Type | Meaning | iOS HealthKit | Android Health Connect |
+|------|---------|---------------|------------------------|
+| `activeCalories` | Energy burned by activity, on top of resting | `activeEnergyBurned` | `ActiveCaloriesBurnedRecord` |
+| `basalCalories` | Resting/basal energy | `basalEnergyBurned` | *derived* from `BasalMetabolicRateRecord` |
+| `totalCalories` | All energy burned — active + basal | *derived* from `activeEnergyBurned` + `basalEnergyBurned` | `TotalCaloriesBurnedRecord` |
+
+Each platform stores two of the three natively, so the library computes the
+remaining one:
+
+```typescript
+// Same number on iOS and Android: everything burned today.
+const total = await HealthKits.readData({
+  type: 'totalCalories',
+  startDate: startOfDay,
+  endDate: new Date(),
+});
+```
+
+> **Derived types have no records of their own.** A plain read returns a single
+> record covering the whole `startDate`–`endDate` window, with a generated `id`
+> and a `"derived"` source (`limit` has nothing to page through). Pass
+> `aggregate: true` with an `aggregateInterval` to get one value per interval
+> instead — those come back with an `"aggregated"` source, like any other
+> aggregate. Writing or subscribing to a derived type rejects with
+> `UNSUPPORTED_DATA_TYPE`; use the underlying types. As with aggregates, don't
+> persist derived records as a source of truth.
 
 ### Reading Sleep Data
 
@@ -209,7 +243,7 @@ interface ReadOptions {
   startDate: Date | string;
   endDate: Date | string;
   limit?: number;
-  /** Cumulative types only (steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). */
+  /** Cumulative types only (steps, distance, activeCalories, basalCalories, totalCalories, floorsClimbed, hydration). */
   aggregate?: boolean;
   /** Defaults to 'day'. */
   aggregateInterval?: 'hour' | 'day' | 'week' | 'month';
@@ -235,7 +269,8 @@ Open Health Connect settings on Android. No-op on iOS.
 | `steps` | ✅ | ✅ |
 | `distance` | ✅ | ✅ |
 | `activeCalories` | ✅ | ✅ |
-| `totalCalories` | ✅ | ✅ |
+| `basalCalories` | ✅ | ✅ (derived) |
+| `totalCalories` | ✅ (derived) | ✅ |
 | `floorsClimbed` | ✅ | ✅ |
 | `heartRate` | ✅ | ✅ |
 | `restingHeartRate` | ✅ | ✅ |
@@ -295,6 +330,16 @@ try {
 ```
 
 ## Troubleshooting
+
+### `TurboModuleRegistry.getEnforcing('HealthKits') could not be found`
+
+This means the native module isn't compiled into the app. Check, in order:
+
+1. **New Architecture is enabled.** This is a Turbo Native Module and requires the New Architecture (default in RN 0.76+). iOS: `RCT_NEW_ARCH_ENABLED=1`. Android: `newArchEnabled=true` in `gradle.properties`.
+2. **You rebuilt the native app, not just reloaded JS.** Native changes need a full rebuild — `npx react-native run-ios` / `run-android`, or build from Xcode/Android Studio. A Metro reload is not enough.
+3. **iOS pods are installed:** `cd ios && pod install` after adding the package (or `RCT_NEW_ARCH_ENABLED=1 pod install`).
+4. **Metro cache is clear:** `npx react-native start --reset-cache`.
+5. **You are not running in Expo Go**, which can't load custom native modules — use a development build / `expo prebuild`.
 
 ### iOS
 
