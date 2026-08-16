@@ -308,6 +308,46 @@ try {
 - **Permissions not granted**: Users must manually grant permissions in Health Connect settings.
 - **Data not syncing**: Some devices require the Health Connect app to be opened at least once.
 
+## Migrating from 1.x to 2.0
+
+2.0 is breaking in two places: the module now requires the New Architecture, and
+the energy types mean the same thing on both platforms. Full detail in
+[CHANGELOG.md](./CHANGELOG.md).
+
+### The New Architecture is required
+
+This is a Turbo Native Module and will not load on the legacy bridge. You need
+React Native >= 0.76 with the New Architecture enabled — the default since 0.76.
+Stay on 1.x if you haven't migrated yet.
+
+### iOS deployment target is 16.0
+
+Raise `platform :ios` in your Podfile if it is lower. 1.x declared 13.0 but never
+actually compiled below 16.0.
+
+### `totalCalories` on iOS changed meaning
+
+It used to return resting energy on iOS while returning active + basal on
+Android. It now means active + basal on both. If you were reading it on iOS to
+get resting energy, switch to the new `basalCalories` type:
+
+```diff
+  await HealthKits.readData({
+-   type: 'totalCalories',
++   type: 'basalCalories',
+    startDate, endDate,
+  });
+```
+
+If you wanted total energy all along, nothing changes — you were getting the
+wrong number on iOS and the right one on Android, and both are now correct.
+
+### Aggregation rejects non-cumulative types
+
+In 1.x, `aggregate: true` on `heartRate` or `weight` returned meaningless sums on
+iOS and was ignored entirely on Android. Both now reject with
+`UNSUPPORTED_DATA_TYPE`. Read those as raw records and aggregate in app code.
+
 ## Platform Notes
 
 ### iOS
