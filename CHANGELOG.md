@@ -8,8 +8,30 @@ All notable changes to this project will be documented in this file.
 - Android: `readData` now honors `aggregate` / `aggregateInterval` using Health
   Connect's aggregate APIs (`aggregateGroupByPeriod` for day/week/month,
   `aggregateGroupByDuration` for hour), reaching parity with iOS.
+- New `basalCalories` data type for resting/basal energy, on both platforms.
+  iOS reads `basalEnergyBurned` directly; Android derives it from
+  `BasalMetabolicRateRecord` via `BASAL_CALORIES_TOTAL`.
+- Android: `writeData` supports `totalCalories`, which previously fell through
+  the `when` and silently resolved `false`.
 
 ### Changed
+- **Breaking — iOS `totalCalories` now means total energy (active + basal).**
+  It previously mapped to `basalEnergyBurned`, i.e. resting energy only, while
+  Android mapped it to `TotalCaloriesBurnedRecord` (active + basal), so the
+  same type returned two different metrics per platform (fixes #4). iOS now
+  derives it by summing `activeEnergyBurned` + `basalEnergyBurned`. **If you
+  were reading `totalCalories` on iOS to get resting energy, switch to
+  `basalCalories`.**
+- Derived types (`totalCalories` on iOS, `basalCalories` on Android) have no
+  records of their own: an un-aggregated read returns one record for the whole
+  window with a generated `id` and a `"derived"` source, while an aggregated
+  read buckets by interval and reports an `"aggregated"` source like any other
+  aggregate. Writing, subscribing to, or requesting write access for one rejects
+  with `UNSUPPORTED_DATA_TYPE`. Requesting *read* access for `totalCalories` on
+  iOS now covers both underlying types, since the derived read needs both.
+- `healthDataTypeToiOS` / `healthDataTypeToAndroid` are now typed
+  `Record<HealthDataType, string | string[]>`; `totalCalories` on iOS lists both
+  identifiers it is derived from.
 - **BREAKING:** Converted to a true Turbo Native Module and dropped legacy-bridge
   support. The library now requires the **New Architecture** (bridgeless) and
   **React Native >= 0.76**.
@@ -31,10 +53,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Aggregation is now restricted to cumulative types (`steps`, `distance`,
-  `activeCalories`, `totalCalories`, `floorsClimbed`, `hydration`) on both
-  platforms. Previously iOS silently summed instantaneous types (e.g.
-  `heartRate`, `weight`), and Android ignored `aggregate` entirely. Unsupported
-  types now reject with `UNSUPPORTED_DATA_TYPE`.
+  `activeCalories`, `basalCalories`, `totalCalories`, `floorsClimbed`,
+  `hydration`) on both platforms. Previously iOS silently summed instantaneous
+  types (e.g. `heartRate`, `weight`), and Android ignored `aggregate` entirely.
+  Unsupported types now reject with `UNSUPPORTED_DATA_TYPE`.
+- iOS: writing `totalCalories` no longer silently stores the value as basal
+  energy. Derived types reject instead, pointing at the types to write.
 
 ## [1.0.0] - 2025-11-26
 

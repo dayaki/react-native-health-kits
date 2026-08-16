@@ -63,7 +63,14 @@ class HealthKits: RCTEventEmitter {
             guard let typeString = permission["type"],
                   let access = permission["access"] else { continue }
             
-            if let hkType = getHKObjectType(for: typeString) {
+            if access == "write", let components = derivedComponents(for: typeString) {
+                reject("UNSUPPORTED_DATA_TYPE", "'\(typeString)' is derived on iOS and cannot be written. Request write access for \(components.joined(separator: " and ")) instead.", nil)
+                return
+            }
+
+            // Derived types (totalCalories) expand to every component they read
+            // from, so requesting one grants read access to all of its parts.
+            for hkType in getHKObjectTypes(for: typeString) {
                 if access == "read" {
                     readTypes.insert(hkType)
                 } else if access == "write", let sampleType = hkType as? HKSampleType {
@@ -85,11 +92,21 @@ class HealthKits: RCTEventEmitter {
     
     @objc(getPermissionStatus:accessType:resolve:reject:)
     func getPermissionStatus(_ dataType: String, accessType: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        if let components = derivedComponents(for: dataType) {
+            if accessType == "write" {
+                reject("UNSUPPORTED_DATA_TYPE", "'\(dataType)' is derived on iOS and cannot be written. Check write status for \(components.joined(separator: " or ")) instead.", nil)
+            } else {
+                // Same as any other read type: HealthKit does not reveal read status.
+                resolve("notDetermined")
+            }
+            return
+        }
+
         guard let hkType = getHKObjectType(for: dataType) else {
             reject("UNSUPPORTED_DATA_TYPE", "Unsupported data type: \(dataType)", nil)
             return
         }
-        
+
         if accessType == "write", let sampleType = hkType as? HKSampleType {
             let status = healthStore.authorizationStatus(for: sampleType)
             switch status {
@@ -135,9 +152,16 @@ class HealthKits: RCTEventEmitter {
             readSleepData(startDate: startDate, endDate: endDate, limit: limit, resolve: resolve, reject: reject)
         } else if typeString == "workout" {
             readWorkoutData(startDate: startDate, endDate: endDate, limit: limit, resolve: resolve, reject: reject)
+        } else if let components = derivedComponents(for: typeString) {
+            // Derived types have no samples of their own. An aggregated read sums
+            // each component per interval; a raw read has nothing to return
+            // sample-by-sample, so it collapses to a single record covering the
+            // whole window.
+            let interval: String? = aggregate ? (options["aggregateInterval"] as? String ?? "day") : nil
+            readDerivedData(type: typeString, components: components, startDate: startDate, endDate: endDate, interval: interval, resolve: resolve, reject: reject)
         } else if aggregate {
             guard isCumulativeType(typeString) else {
-                reject("UNSUPPORTED_DATA_TYPE", "Aggregation is only supported for cumulative types (steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). '\(typeString)' is not a cumulative type; read raw records and aggregate in app code, or omit `aggregate`.", nil)
+                reject("UNSUPPORTED_DATA_TYPE", "Aggregation is only supported for cumulative types (steps, distance, activeCalories, basalCalories, totalCalories, floorsClimbed, hydration). '\(typeString)' is not a cumulative type; read raw records and aggregate in app code, or omit `aggregate`.", nil)
                 return
             }
             let interval = options["aggregateInterval"] as? String ?? "day"
@@ -163,7 +187,12 @@ class HealthKits: RCTEventEmitter {
             reject("INVALID_PARAMETERS", "Invalid date format", nil)
             return
         }
-        
+
+        if let components = derivedComponents(for: typeString) {
+            reject("UNSUPPORTED_DATA_TYPE", "'\(typeString)' is derived on iOS from \(components.joined(separator: " + ")) and cannot be written. Write those types instead.", nil)
+            return
+        }
+
         if typeString == "workout" {
             writeWorkoutData(data: writeData, startDate: date, resolve: resolve, reject: reject)
         } else if typeString == "sleep" {
@@ -177,6 +206,11 @@ class HealthKits: RCTEventEmitter {
     
     @objc(subscribeToUpdates:resolve:reject:)
     func subscribeToUpdates(_ dataType: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        if let components = derivedComponents(for: dataType) {
+            reject("UNSUPPORTED_DATA_TYPE", "'\(dataType)' is derived on iOS and has no samples to observe. Subscribe to \(components.joined(separator: " and ")) instead.", nil)
+            return
+        }
+
         guard let sampleType = getHKSampleType(for: dataType) else {
             reject("UNSUPPORTED_DATA_TYPE", "Unsupported data type: \(dataType)", nil)
             return
@@ -235,7 +269,7 @@ class HealthKits: RCTEventEmitter {
             return HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)
         case "activeCalories":
             return HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)
-        case "totalCalories":
+        case "basalCalories":
             return HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned)
         case "floorsClimbed":
             return HKQuantityType.quantityType(forIdentifier: .flightsClimbed)
@@ -282,12 +316,33 @@ class HealthKits: RCTEventEmitter {
         return getHKObjectType(for: typeString) as? HKSampleType
     }
 
+    /// HealthKit has no single "total energy burned" quantity type, so
+    /// `totalCalories` is derived from the two types that make it up. Every
+    /// other type maps to exactly one.
+    private func derivedComponents(for typeString: String) -> [String]? {
+        switch typeString {
+        case "totalCalories":
+            return ["activeCalories", "basalCalories"]
+        default:
+            return nil
+        }
+    }
+
+    /// Every HealthKit type a unified type reads from — more than one for
+    /// derived types, so permission requests cover all of their components.
+    private func getHKObjectTypes(for typeString: String) -> [HKObjectType] {
+        if let components = derivedComponents(for: typeString) {
+            return components.compactMap { getHKObjectType(for: $0) }
+        }
+        return [getHKObjectType(for: typeString)].compactMap { $0 }
+    }
+
     /// Aggregation (cumulative sum per interval) only has a well-defined meaning
     /// for cumulative quantity types. Instantaneous types (heart rate, weight,
     /// blood glucose, etc.) must be read as raw records instead.
     private func isCumulativeType(_ typeString: String) -> Bool {
         switch typeString {
-        case "steps", "distance", "activeCalories", "totalCalories", "floorsClimbed", "hydration":
+        case "steps", "distance", "activeCalories", "basalCalories", "totalCalories", "floorsClimbed", "hydration":
             return true
         default:
             return false
@@ -300,7 +355,7 @@ class HealthKits: RCTEventEmitter {
             return .count()
         case "distance", "height":
             return .meter()
-        case "activeCalories", "totalCalories":
+        case "activeCalories", "basalCalories", "totalCalories":
             return .kilocalorie()
         case "heartRate", "restingHeartRate":
             return HKUnit.count().unitDivided(by: .minute())
@@ -375,12 +430,7 @@ class HealthKits: RCTEventEmitter {
         healthStore.execute(query)
     }
     
-    private func readAggregatedData(type: String, startDate: Date, endDate: Date, interval: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        guard let quantityType = getHKSampleType(for: type) as? HKQuantityType else {
-            reject("UNSUPPORTED_DATA_TYPE", "Unsupported data type: \(type)", nil)
-            return
-        }
-        
+    private func intervalComponents(for interval: String) -> DateComponents {
         var dateComponents = DateComponents()
         switch interval {
         case "hour":
@@ -392,9 +442,143 @@ class HealthKits: RCTEventEmitter {
         default:
             dateComponents.day = 1
         }
-        
+        return dateComponents
+    }
+
+    /// Reads a type that HealthKit does not store, by summing the types it does.
+    ///
+    /// `interval` nil means a single bucket spanning the whole window — a raw
+    /// read of a derived type, which has no samples of its own to return one by
+    /// one. Otherwise there is one bucket per interval, as with any aggregation.
+    private func readDerivedData(type: String, components: [String], startDate: Date, endDate: Date, interval: String?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        var quantityTypes: [HKQuantityType] = []
+        for component in components {
+            guard let quantityType = getHKSampleType(for: component) as? HKQuantityType else {
+                reject("UNSUPPORTED_DATA_TYPE", "Unsupported data type: \(component)", nil)
+                return
+            }
+            quantityTypes.append(quantityType)
+        }
+
+        let unit = getHKUnit(for: type)
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+
+        // Components are keyed by bucket start so their sums line up. Each
+        // component's results arrive on its own queue, so merging is serialised.
+        var buckets: [Date: (start: Date, end: Date, value: Double)] = [:]
+        let mergeQueue = DispatchQueue(label: "com.dayaki.healthkits.derived")
+        let group = DispatchGroup()
+        var queryError: Error?
+
+        // Always called on mergeQueue.
+        let accumulate: (Date, Date, HKQuantity) -> Void = { start, end, sum in
+            let existing = buckets[start]
+            buckets[start] = (
+                start: start,
+                end: existing.map { max($0.end, end) } ?? end,
+                value: (existing?.value ?? 0) + sum.doubleValue(for: unit)
+            )
+        }
+
+        for quantityType in quantityTypes {
+            group.enter()
+
+            if let interval = interval {
+                let query = HKStatisticsCollectionQuery(
+                    quantityType: quantityType,
+                    quantitySamplePredicate: predicate,
+                    options: [.cumulativeSum],
+                    anchorDate: startDate,
+                    intervalComponents: intervalComponents(for: interval)
+                )
+                query.initialResultsHandler = { _, results, error in
+                    mergeQueue.async {
+                        if let error = error {
+                            queryError = queryError ?? error
+                        } else if let results = results {
+                            results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                                guard let sum = statistics.sumQuantity() else { return }
+                                accumulate(statistics.startDate, statistics.endDate, sum)
+                            }
+                        }
+                        group.leave()
+                    }
+                }
+                healthStore.execute(query)
+            } else {
+                let query = HKStatisticsQuery(
+                    quantityType: quantityType,
+                    quantitySamplePredicate: predicate,
+                    options: [.cumulativeSum]
+                ) { _, statistics, error in
+                    mergeQueue.async {
+                        if let error = error {
+                            queryError = queryError ?? error
+                        } else if let sum = statistics?.sumQuantity() {
+                            // Anchor every component to the requested window so
+                            // they land in the same single bucket.
+                            accumulate(startDate, endDate, sum)
+                        }
+                        group.leave()
+                    }
+                }
+                healthStore.execute(query)
+            }
+        }
+
+        group.notify(queue: mergeQueue) { [weak self] in
+            if let error = queryError {
+                reject("READ_FAILED", error.localizedDescription, error)
+                return
+            }
+
+            guard let self = self else {
+                resolve("[]")
+                return
+            }
+
+            let unitString = self.getUnitString(for: type)
+            let formatter = ISO8601DateFormatter()
+            // An interval means this was an aggregation request, so it reports the
+            // same source as any other aggregate — Android does likewise for the
+            // type it derives. Only a raw read reports "derived".
+            let sourceName = interval == nil ? "Derived" : "Aggregated"
+            let sourceId = interval == nil ? "derived" : "aggregated"
+
+            let results: [[String: Any]] = buckets.values
+                .sorted { $0.start < $1.start }
+                .map { bucket in
+                    [
+                        "id": UUID().uuidString,
+                        "type": type,
+                        "value": bucket.value,
+                        "unit": unitString,
+                        "startDate": formatter.string(from: bucket.start),
+                        "endDate": formatter.string(from: bucket.end),
+                        "sourceName": sourceName,
+                        "sourceId": sourceId
+                    ]
+                }
+
+            if let jsonData = try? JSONSerialization.data(withJSONObject: results),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                resolve(jsonString)
+            } else {
+                resolve("[]")
+            }
+        }
+    }
+
+    private func readAggregatedData(type: String, startDate: Date, endDate: Date, interval: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let quantityType = getHKSampleType(for: type) as? HKQuantityType else {
+            reject("UNSUPPORTED_DATA_TYPE", "Unsupported data type: \(type)", nil)
+            return
+        }
         
+        let dateComponents = intervalComponents(for: interval)
+
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+
         let query = HKStatisticsCollectionQuery(
             quantityType: quantityType,
             quantitySamplePredicate: predicate,
@@ -769,7 +953,7 @@ class HealthKits: RCTEventEmitter {
             return "count"
         case "distance", "height":
             return "meters"
-        case "activeCalories", "totalCalories":
+        case "activeCalories", "basalCalories", "totalCalories":
             return "kcal"
         case "heartRate", "restingHeartRate", "respiratoryRate":
             return "bpm"

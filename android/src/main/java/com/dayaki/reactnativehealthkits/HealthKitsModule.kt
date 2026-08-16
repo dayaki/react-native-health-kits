@@ -12,6 +12,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -155,13 +156,20 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
                         promise.reject(
                             "UNSUPPORTED_DATA_TYPE",
                             "Aggregation is only supported for cumulative types " +
-                                "(steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). " +
+                                "(steps, distance, activeCalories, basalCalories, totalCalories, floorsClimbed, hydration). " +
                                 "'$type' is not a cumulative type; read raw records and aggregate in app code, or omit `aggregate`."
                         )
                         return@launch
                     }
                     val interval = options.optString("aggregateInterval", "day")
                     promise.resolve(readAggregatedData(client, type, startDate, endDate, interval).toString())
+                    return@launch
+                }
+
+                // Derived types have no records of their own to page through, so an
+                // un-aggregated read collapses to one record for the whole window.
+                if (isDerivedType(type)) {
+                    promise.resolve(readDerivedData(client, type, startDate, endDate).toString())
                     return@launch
                 }
 
@@ -209,10 +217,21 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
                 val type = data.getString("type")
                 val date = Instant.parse(data.getString("date"))
 
+                if (isDerivedType(type)) {
+                    promise.reject(
+                        "UNSUPPORTED_DATA_TYPE",
+                        "'$type' is derived on Android and cannot be written. Health Connect " +
+                            "stores a basal metabolic rate rather than basal energy; write " +
+                            "activeCalories or totalCalories instead."
+                    )
+                    return@launch
+                }
+
                 val success = when (type) {
                     "steps" -> writeSteps(client, data, date)
                     "distance" -> writeDistance(client, data, date)
                     "activeCalories" -> writeActiveCalories(client, data, date)
+                    "totalCalories" -> writeTotalCalories(client, data, date)
                     "weight" -> writeWeight(client, data, date)
                     "height" -> writeHeight(client, data, date)
                     "heartRate" -> writeHeartRate(client, data, date)
@@ -325,6 +344,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
             "steps" -> StepsRecord::class
             "distance" -> DistanceRecord::class
             "activeCalories" -> ActiveCaloriesBurnedRecord::class
+            "basalCalories" -> BasalMetabolicRateRecord::class
             "totalCalories" -> TotalCaloriesBurnedRecord::class
             "floorsClimbed" -> FloorsClimbedRecord::class
             "heartRate" -> HeartRateRecord::class
@@ -355,14 +375,24 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
      * glucose, etc.) must be read as raw records instead.
      */
     private fun isCumulativeType(type: String): Boolean = when (type) {
-        "steps", "distance", "activeCalories", "totalCalories", "floorsClimbed", "hydration" -> true
+        "steps", "distance", "activeCalories", "basalCalories", "totalCalories", "floorsClimbed", "hydration" -> true
         else -> false
     }
+
+    /**
+     * Types Health Connect has no stored equivalent for, which this module computes
+     * instead. `basalCalories` is energy, but Health Connect only records a basal
+     * metabolic *rate* — [BasalMetabolicRateRecord.BASAL_CALORIES_TOTAL] turns that
+     * rate into energy over a time range. iOS derives `totalCalories` for the
+     * mirror-image reason.
+     */
+    private fun isDerivedType(type: String): Boolean = type == "basalCalories"
 
     private fun aggregateMetricFor(type: String): AggregateMetric<*>? = when (type) {
         "steps" -> StepsRecord.COUNT_TOTAL
         "distance" -> DistanceRecord.DISTANCE_TOTAL
         "activeCalories" -> ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
+        "basalCalories" -> BasalMetabolicRateRecord.BASAL_CALORIES_TOTAL
         "totalCalories" -> TotalCaloriesBurnedRecord.ENERGY_TOTAL
         "floorsClimbed" -> FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL
         "hydration" -> HydrationRecord.VOLUME_TOTAL
@@ -373,6 +403,7 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
         "steps" -> result[StepsRecord.COUNT_TOTAL]?.toDouble()
         "distance" -> result[DistanceRecord.DISTANCE_TOTAL]?.inMeters
         "activeCalories" -> result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+        "basalCalories" -> result[BasalMetabolicRateRecord.BASAL_CALORIES_TOTAL]?.inKilocalories
         "totalCalories" -> result[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories
         "floorsClimbed" -> result[FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL]
         "hydration" -> result[HydrationRecord.VOLUME_TOTAL]?.inLiters
@@ -382,24 +413,63 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
     private fun aggregateUnitString(type: String): String = when (type) {
         "steps", "floorsClimbed" -> "count"
         "distance" -> "meters"
-        "activeCalories", "totalCalories" -> "kcal"
+        "activeCalories", "basalCalories", "totalCalories" -> "kcal"
         "hydration" -> "liters"
         else -> "count"
     }
 
-    private fun aggregateRecord(type: String, value: Double, unit: String, start: Instant, end: Instant): JSONObject =
+    /**
+     * Aggregated and derived buckets are synthetic and not deduplicable across
+     * syncs; they get a generated id and a constant source, mirroring iOS.
+     */
+    private fun syntheticRecord(
+        type: String,
+        value: Double,
+        unit: String,
+        start: Instant,
+        end: Instant,
+        sourceName: String,
+        sourceId: String
+    ): JSONObject =
         JSONObject().apply {
-            // Aggregated buckets are synthetic and not deduplicable across syncs;
-            // generate an id and a constant "aggregated" source to mirror iOS.
             put("id", UUID.randomUUID().toString())
             put("type", type)
             put("value", value)
             put("unit", unit)
             put("startDate", start.toString())
             put("endDate", end.toString())
-            put("sourceName", "Aggregated")
-            put("sourceId", "aggregated")
+            put("sourceName", sourceName)
+            put("sourceId", sourceId)
         }
+
+    private fun aggregateRecord(type: String, value: Double, unit: String, start: Instant, end: Instant): JSONObject =
+        syntheticRecord(type, value, unit, start, end, "Aggregated", "aggregated")
+
+    /**
+     * Reads a [isDerivedType] over the whole requested window as a single record.
+     *
+     * There are no stored records to page through, so `limit` has nothing to apply
+     * to. Use `aggregate` with an `aggregateInterval` to get one value per interval
+     * instead of one value for the range.
+     */
+    private suspend fun readDerivedData(
+        client: HealthConnectClient,
+        type: String,
+        start: Instant,
+        end: Instant
+    ): JSONArray {
+        val metric = aggregateMetricFor(type) ?: return JSONArray()
+        val response = client.aggregate(
+            AggregateRequest(
+                metrics = setOf(metric),
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
+        )
+        val value = extractAggregateValue(type, response) ?: return JSONArray()
+        return JSONArray().put(
+            syntheticRecord(type, value, aggregateUnitString(type), start, end, "Derived", "derived")
+        )
+    }
 
     /**
      * Aggregate a cumulative metric into interval buckets using Health Connect's
@@ -1015,6 +1085,19 @@ class HealthKitsModule(reactContext: ReactApplicationContext) :
     private suspend fun writeActiveCalories(client: HealthConnectClient, data: JSONObject, startTime: Instant): Boolean {
         val endTime = if (data.has("endDate")) Instant.parse(data.getString("endDate")) else startTime.plusSeconds(60)
         val record = ActiveCaloriesBurnedRecord(
+            energy = Energy.kilocalories(data.getDouble("value")),
+            startTime = startTime,
+            endTime = endTime,
+            startZoneOffset = ZoneOffset.UTC,
+            endZoneOffset = ZoneOffset.UTC
+        )
+        client.insertRecords(listOf(record))
+        return true
+    }
+
+    private suspend fun writeTotalCalories(client: HealthConnectClient, data: JSONObject, startTime: Instant): Boolean {
+        val endTime = if (data.has("endDate")) Instant.parse(data.getString("endDate")) else startTime.plusSeconds(60)
+        val record = TotalCaloriesBurnedRecord(
             energy = Energy.kilocalories(data.getDouble("value")),
             startTime = startTime,
             endTime = endTime,
