@@ -625,7 +625,7 @@ class HealthKits: RCTEventEmitter {
         case .softball: return "softball"
         case .volleyball: return "volleyball"
         case .tableTennis: return "tableTennis"
-        case .skating: return "skating"
+        case .skatingSports: return "skating"
         case .crossCountrySkiing: return "crossCountrySkiing"
         case .downhillSkiing: return "downhillSkiing"
         case .snowboarding: return "snowboarding"
@@ -753,7 +753,7 @@ class HealthKits: RCTEventEmitter {
         case "softball": return .softball
         case "volleyball": return .volleyball
         case "tableTennis": return .tableTennis
-        case "skating": return .skating
+        case "skating": return .skatingSports
         case "crossCountrySkiing": return .crossCountrySkiing
         case "downhillSkiing": return .downhillSkiing
         case "snowboarding": return .snowboarding

@@ -66,13 +66,16 @@ android {
         disable "GradleCompatible"
     }
 
+    // React Native 0.76 builds on JDK 17 and compiles app Java at 17. Leaving
+    // these at 1.8 makes Gradle fail the build with "Inconsistent JVM-target
+    // compatibility detected" as soon as the library's Kotlin is compiled.
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 }
 
