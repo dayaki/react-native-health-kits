@@ -1,6 +1,6 @@
 {
   "name": "@mbdayo/react-native-health-kits",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A unified React Native interface for accessing health data from Android Health Connect and iOS HealthKit",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
