@@ -2,13 +2,21 @@ import type { HealthDataType, WorkoutType, SleepStage } from '../types';
 
 /**
  * Maps unified health data types to iOS HealthKit identifiers
+ *
+ * A type backed by more than one identifier is derived from all of them —
+ * `totalCalories` is the sum of active and basal energy, since HealthKit has
+ * no single "total energy burned" quantity type.
  */
-export const healthDataTypeToiOS: Record<HealthDataType, string> = {
+export const healthDataTypeToiOS: Record<HealthDataType, string | string[]> = {
   // Activity
   steps: 'HKQuantityTypeIdentifierStepCount',
   distance: 'HKQuantityTypeIdentifierDistanceWalkingRunning',
   activeCalories: 'HKQuantityTypeIdentifierActiveEnergyBurned',
-  totalCalories: 'HKQuantityTypeIdentifierBasalEnergyBurned',
+  basalCalories: 'HKQuantityTypeIdentifierBasalEnergyBurned',
+  totalCalories: [
+    'HKQuantityTypeIdentifierActiveEnergyBurned',
+    'HKQuantityTypeIdentifierBasalEnergyBurned',
+  ],
   floorsClimbed: 'HKQuantityTypeIdentifierFlightsClimbed',
   // Vitals
   heartRate: 'HKQuantityTypeIdentifierHeartRate',
@@ -37,12 +45,19 @@ export const healthDataTypeToiOS: Record<HealthDataType, string> = {
 
 /**
  * Maps unified health data types to Android Health Connect record types
+ *
+ * `basalCalories` is derived: Health Connect stores a basal metabolic *rate*,
+ * which the library turns into energy via the `BASAL_CALORIES_TOTAL` metric.
  */
-export const healthDataTypeToAndroid: Record<HealthDataType, string> = {
+export const healthDataTypeToAndroid: Record<
+  HealthDataType,
+  string | string[]
+> = {
   // Activity
   steps: 'StepsRecord',
   distance: 'DistanceRecord',
   activeCalories: 'ActiveCaloriesBurnedRecord',
+  basalCalories: 'BasalMetabolicRateRecord',
   totalCalories: 'TotalCaloriesBurnedRecord',
   floorsClimbed: 'FloorsClimbedRecord',
   // Vitals

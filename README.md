@@ -133,10 +133,11 @@ const dailySteps = await HealthKits.readData({
 
 > **Aggregation is for cumulative types only.** `aggregate` produces a
 > cumulative sum per interval, which is only meaningful for **`steps`,
-> `distance`, `activeCalories`, `totalCalories`, `floorsClimbed`, and
-> `hydration`**. Requesting it for any other (instantaneous) type — e.g.
-> `heartRate`, `weight`, `bloodGlucose` — rejects with `UNSUPPORTED_DATA_TYPE`.
-> Read those as raw records and aggregate in app code instead.
+> `distance`, `activeCalories`, `basalCalories`, `totalCalories`,
+> `floorsClimbed`, and `hydration`**. Requesting it for any other
+> (instantaneous) type — e.g. `heartRate`, `weight`, `bloodGlucose` — rejects
+> with `UNSUPPORTED_DATA_TYPE`. Read those as raw records and aggregate in app
+> code instead.
 >
 > This behaves the same on iOS (HealthKit `HKStatisticsCollectionQuery`) and
 > Android (Health Connect `aggregateGroupByPeriod` / `aggregateGroupByDuration`).
@@ -145,6 +146,38 @@ const dailySteps = await HealthKits.readData({
 > synthetic — each query assigns a generated `id` and an `"aggregated"` source,
 > so they have no stable identity and can't be deduplicated. Persist raw
 > provider records as your source of truth and aggregate at read time.
+
+### Energy (Calories)
+
+Energy types are defined by what they mean, not by which platform record backs
+them, so the same type means the same thing on both platforms:
+
+| Type | Meaning | iOS HealthKit | Android Health Connect |
+|------|---------|---------------|------------------------|
+| `activeCalories` | Energy burned by activity, on top of resting | `activeEnergyBurned` | `ActiveCaloriesBurnedRecord` |
+| `basalCalories` | Resting/basal energy | `basalEnergyBurned` | *derived* from `BasalMetabolicRateRecord` |
+| `totalCalories` | All energy burned — active + basal | *derived* from `activeEnergyBurned` + `basalEnergyBurned` | `TotalCaloriesBurnedRecord` |
+
+Each platform stores two of the three natively, so the library computes the
+remaining one:
+
+```typescript
+// Same number on iOS and Android: everything burned today.
+const total = await HealthKits.readData({
+  type: 'totalCalories',
+  startDate: startOfDay,
+  endDate: new Date(),
+});
+```
+
+> **Derived types have no records of their own.** A plain read returns a single
+> record covering the whole `startDate`–`endDate` window, with a generated `id`
+> and a `"derived"` source (`limit` has nothing to page through). Pass
+> `aggregate: true` with an `aggregateInterval` to get one value per interval
+> instead — those come back with an `"aggregated"` source, like any other
+> aggregate. Writing or subscribing to a derived type rejects with
+> `UNSUPPORTED_DATA_TYPE`; use the underlying types. As with aggregates, don't
+> persist derived records as a source of truth.
 
 ### Reading Sleep Data
 
@@ -209,7 +242,7 @@ interface ReadOptions {
   startDate: Date | string;
   endDate: Date | string;
   limit?: number;
-  /** Cumulative types only (steps, distance, activeCalories, totalCalories, floorsClimbed, hydration). */
+  /** Cumulative types only (steps, distance, activeCalories, basalCalories, totalCalories, floorsClimbed, hydration). */
   aggregate?: boolean;
   /** Defaults to 'day'. */
   aggregateInterval?: 'hour' | 'day' | 'week' | 'month';
@@ -235,7 +268,8 @@ Open Health Connect settings on Android. No-op on iOS.
 | `steps` | ✅ | ✅ |
 | `distance` | ✅ | ✅ |
 | `activeCalories` | ✅ | ✅ |
-| `totalCalories` | ✅ | ✅ |
+| `basalCalories` | ✅ | ✅ (derived) |
+| `totalCalories` | ✅ (derived) | ✅ |
 | `floorsClimbed` | ✅ | ✅ |
 | `heartRate` | ✅ | ✅ |
 | `restingHeartRate` | ✅ | ✅ |
